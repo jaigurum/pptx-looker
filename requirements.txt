@@ -1,1 +1,11 @@
 streamlit
+pandas
+python-pptx~=0.6.21
+openpyxl
+Pillow==9.3.0
+requests
+plotly
+kaleido
+PyPDF2
+pdf2image
+pymupdf

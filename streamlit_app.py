@@ -42,10 +42,10 @@ def convert_pdf_to_pptx_from_pages(pdf_file, pdf_filename):
 
 # Streamlit app UI
 def main():
-    st.title("PDF to PPTX Converter (Render PDF Pages as Images)")
+    st.title("VML PDF to PPTX Converter")
 
     # Step 1: Upload PDF
-    uploaded_pdf = st.file_uploader("Upload a PDF file", type="pdf")
+    uploaded_pdf = st.file_uploader("Upload your lookerstudio report as a PDF file", type="pdf")
 
     if uploaded_pdf is not None:
         st.success("PDF uploaded successfully!")
@@ -58,7 +58,7 @@ def main():
             # Pass the uploaded PDF to the conversion function
             with st.spinner("Converting..."):
                 pptx_path, pptx_filename = convert_pdf_to_pptx_from_pages(uploaded_pdf, pdf_filename)
-                st.success(f"Conversion successful! Download {pptx_filename}")
+                st.success(f"Conversion successful! each page in pdf is in a separate slide. Download {pptx_filename}")
 
                 # Step 3: Provide download link
                 with open(pptx_path, "rb") as pptx_file:

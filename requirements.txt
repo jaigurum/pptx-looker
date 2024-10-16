@@ -9,3 +9,8 @@ kaleido
 PyPDF2
 pdf2image
 pymupdf
+fitz
+pptx
+pptx.util
+tempfile
+PIL

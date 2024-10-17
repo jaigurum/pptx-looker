@@ -1,6 +1,6 @@
 import fitz  # PyMuPDF
 from pptx import Presentation
-from pptx.util import Inches
+from pptx.util import Inches, Pt
 import streamlit as st
 import tempfile
 import os
@@ -104,15 +104,40 @@ def convert_images_to_pptx(section_images, pdf_filename):
         st.error(f"Failed to create PowerPoint presentation: {e}")
         return None, None
 
+    # Slide dimensions and margins for fitting images and adding text
+    slide_width = Inches(10)
+    slide_height = Inches(7.5)
+
     # Add each image to a separate slide
-    for idx, (img_tmp_path, _) in enumerate(section_images):
+    for idx, (img_tmp_path, image) in enumerate(section_images):
         try:
             # Add a blank slide to the presentation
             slide_layout = presentation.slide_layouts[6]  # Blank layout
             slide = presentation.slides.add_slide(slide_layout)
-            
-            # Insert the image into the slide
-            slide.shapes.add_picture(img_tmp_path, Inches(0), Inches(0), width=Inches(10), height=Inches(7.5))
+
+            # Resize the image to fit within the slide dimensions while maintaining aspect ratio
+            image_width, image_height = image.size
+            aspect_ratio = image_width / image_height
+
+            # Calculate new dimensions to fit within slide dimensions
+            if aspect_ratio > (slide_width / slide_height):
+                new_width = slide_width
+                new_height = new_width / aspect_ratio
+            else:
+                new_height = slide_height
+                new_width = new_height * aspect_ratio
+
+            # Center the image on the slide
+            x_offset = (slide_width - new_width) / 2
+            y_offset = (slide_height - new_height) / 2
+            slide.shapes.add_picture(img_tmp_path, x_offset, y_offset, width=new_width, height=new_height)
+
+            # Add a placeholder text box below the image for adding comments or details
+            text_box = slide.shapes.add_textbox(Inches(1), slide_height - Inches(1), slide_width - Inches(2), Inches(1))
+            text_frame = text_box.text_frame
+            text_frame.text = "   "
+            text_frame.paragraphs[0].font.size = Pt(14)
+
         except Exception as e:
             st.error(f"Failed to add image {idx} to slide: {e}")
             continue
@@ -151,14 +176,30 @@ def main():
 
         # Step 3: Display all images before conversion
         st.subheader("Preview of Extracted Sections")
-        for idx, (_, image) in enumerate(section_images):
+        
+        # Checkbox for selecting all images
+        select_all = st.checkbox("Select All Sections")
+        
+        # Store user selections
+        selected_images = []
+
+        # Display each image with a checkbox
+        for idx, (img_tmp_path, image) in enumerate(section_images):
+            if select_all:
+                selected = True
+            else:
+                selected = st.checkbox(f"Include Section {idx + 1}", value=False)
+
+            if selected:
+                selected_images.append((img_tmp_path, image))
+
             st.image(image, use_column_width=True, caption=f"Extracted Section {idx + 1}")
 
-        # Step 4: Convert to PPTX
-        if section_images and st.button("Convert to PPTX"):
-            # Pass the images to the conversion function
+        # Step 4: Convert to PPTX (only selected images)
+        if selected_images and st.button("Convert to PPTX"):
+            # Pass the selected images to the conversion function
             with st.spinner("Converting to PPTX..."):
-                pptx_path, pptx_filename = convert_images_to_pptx(section_images, pdf_filename)
+                pptx_path, pptx_filename = convert_images_to_pptx(selected_images, pdf_filename)
                 if pptx_path:
                     st.success(f"Conversion successful! Download {pptx_filename}")
 

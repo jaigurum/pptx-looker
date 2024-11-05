@@ -1,4 +1,3 @@
-import fitz  # PyMuPDF
 from pptx import Presentation
 from pptx.util import Inches, Pt
 import streamlit as st
@@ -6,11 +5,13 @@ import tempfile
 import os
 from PIL import Image
 import io
+import base64
 
 # Function to convert each section of the PDF into an image
 def convert_pdf_sections_to_images(pdf_file):
     try:
         # Open the uploaded PDF using PyMuPDF
+        import fitz  # Import here to avoid errors if not used elsewhere
         pdf_document = fitz.open(stream=pdf_file.read(), filetype="pdf")
     except Exception as e:
         st.error(f"Failed to open PDF: {e}")
@@ -55,7 +56,6 @@ def convert_pdf_sections_to_images(pdf_file):
                 if section_start is not None:
                     section_end_y = y0  # Use the y-coordinate of the new section as the end of the previous section
                     sections.append((section_start, (0, section_start[1], page.rect.width, section_end_y)))
-                    st.info(f"Section found from y={section_start[1]} to y={section_end_y} on page {page_num}")
 
                 # Mark the start of a new section with a top buffer
                 section_start = (x0, max(y0 - top_buffer, 0), x1, y1)
@@ -64,7 +64,6 @@ def convert_pdf_sections_to_images(pdf_file):
         if section_start is not None:
             section_end = (0, page.rect.height, page.rect.width, page.rect.height)  # End of the page
             sections.append((section_start, section_end))
-            st.info(f"Final section found from y={section_start[1]} to y={page.rect.height} on page {page_num}")
 
         # Render each identified section as a separate image
         for idx, section in enumerate(sections):
@@ -153,6 +152,14 @@ def convert_images_to_pptx(section_images, pdf_filename):
         st.error(f"Failed to save PowerPoint file: {e}")
         return None, None
 
+# Function to generate a link for automatic download
+def create_download_link(file_path, filename):
+    with open(file_path, "rb") as f:
+        data = f.read()
+        b64 = base64.b64encode(data).decode()
+        href = f'<a href="data:application/vnd.openxmlformats-officedocument.presentationml.presentation;base64,{b64}" download="{filename}">Download PowerPoint</a>'
+        return href
+
 # Streamlit app UI
 def main():
     st.title("PDF to PPTX Converter")
@@ -161,56 +168,18 @@ def main():
     uploaded_pdf = st.file_uploader("Upload your report as a PDF file", type="pdf")
 
     if uploaded_pdf is not None:
-        st.success("PDF uploaded successfully!")
-        
         # Extract the filename from the uploaded file
         pdf_filename = uploaded_pdf.name
 
-        # Step 2: Convert to Images
-        with st.spinner("Extracting sections..."):
+        # Convert PDF sections to images and then convert to PPTX
+        with st.spinner("Processing PDF and converting to PPTX..."):
             section_images = convert_pdf_sections_to_images(uploaded_pdf)
             if section_images:
-                st.success("Sections extracted successfully!")
-            else:
-                st.warning("No sections found. Please check the PDF formatting.")
-
-        # Step 3: Display all images before conversion
-        st.subheader("Preview of Extracted Sections")
-        
-        # Checkbox for selecting all images
-        select_all = st.checkbox("Select All Sections")
-        
-        # Store user selections
-        selected_images = []
-
-        # Display each image with a checkbox
-        for idx, (img_tmp_path, image) in enumerate(section_images):
-            if select_all:
-                selected = True
-            else:
-                selected = st.checkbox(f"Include Section {idx + 1}", value=False)
-
-            if selected:
-                selected_images.append((img_tmp_path, image))
-
-            st.image(image, use_column_width=True, caption=f"Extracted Section {idx + 1}")
-
-        # Step 4: Convert to PPTX (only selected images)
-        if selected_images and st.button("Convert to PPTX"):
-            # Pass the selected images to the conversion function
-            with st.spinner("Converting to PPTX..."):
-                pptx_path, pptx_filename = convert_images_to_pptx(selected_images, pdf_filename)
+                pptx_path, pptx_filename = convert_images_to_pptx(section_images, pdf_filename)
                 if pptx_path:
-                    st.success(f"Conversion successful! Download {pptx_filename}")
-
-                    # Step 5: Provide download link
-                    with open(pptx_path, "rb") as pptx_file:
-                        st.download_button(
-                            label="Download PPTX",
-                            data=pptx_file,
-                            file_name=pptx_filename,
-                            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                        )
+                    # Automatically initiate the download link
+                    download_link = create_download_link(pptx_path, pptx_filename)
+                    st.markdown(download_link, unsafe_allow_html=True)
                 else:
                     st.error("Failed to convert images to PPTX. Please try again.")
 
